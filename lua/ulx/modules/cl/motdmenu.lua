@@ -39,6 +39,11 @@ function ulx.showMotdMenu( steamid )
 		url = string.gsub( url, "%%steamid%%", steamid )
 		html:OpenURL( url )
 	end
+
+	function html:OnChangeTargetURL(url)
+		gui:OpenURL(url)
+		return false
+	end
 end
 
 function ulx.rcvMotd( mode_, data )
