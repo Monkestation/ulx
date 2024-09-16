@@ -6,7 +6,7 @@ xgui.prepareDataType( "bans" )
 local xbans = xlib.makepanel{ parent=xgui.null }
 
 xbans.banlist = xlib.makelistview{ x=5, y=30, w=572, h=310, multiselect=false, parent=xbans }
-	xbans.banlist:AddColumn( "Name/SteamID" )
+	xbans.banlist:AddColumn( "Name/SteamID/IP" )
 	xbans.banlist:AddColumn( "Banned By" )
 	xbans.banlist:AddColumn( "Unban Date" )
 	xbans.banlist:AddColumn( "Reason" )
@@ -22,6 +22,7 @@ xbans.banlist.OnRowRightClick = function( self, LineID, line )
 	end )
 	menu:AddOption( "Edit Ban...", function()
 		if not line:IsValid() then return end
+		print(xgui.data.bans.cache[LineID].steamid, xgui.data.bans.cache[LineID].steamID)
 		xgui.ShowBanWindow( nil, line:GetValue( 5 ), nil, true, xgui.data.bans.cache[LineID] )
 	end )
 	menu:AddOption( "Remove", function()
@@ -121,6 +122,7 @@ local function banUserList( doFreeze )
 	end
 	menu:AddSpacer()
 	if LocalPlayer():query("ulx banid") then menu:AddOption( "Ban by STEAMID...", function() xgui.ShowBanWindow() end ) end
+	if (LocalPlayer():query("ulx banip") and not doFreeze) then menu:AddOption( "Ban by IP...", function() xgui.ShowIPBanWindow() end ) end
 	menu:Open()
 end
 
@@ -409,6 +411,147 @@ function xgui.ShowBanWindow( ply, ID, doFreeze, isUpdate, bandata )
 
 	if ply then name:SetText( ply:Nick() ) end
 	if ID then steamID:SetText( ID ) else steamID:SetText( "STEAM_0:" ) end
+end
+
+function xgui.ShowIPBanWindow( ply, ID, isUpdate, bandata )
+	if not LocalPlayer():query( "ulx ban" ) and not LocalPlayer():query( "ulx banip" ) then return end
+
+	local xgui_banwindow = xlib.makeframe{ label=( isUpdate and "Edit Ban" or "Ban Player" ), w=285, h=160, skin=xgui.settings.skin }
+	xlib.makelabel{ x=10, y=33, label="IP Address:", parent=xgui_banwindow }
+	xlib.makelabel{ x=28, y=58, label="Reason:", parent=xgui_banwindow }
+	xlib.makelabel{ x=10, y=83, label="Ban Length:", parent=xgui_banwindow }
+	local reason = xlib.makecombobox{ x=75, y=58, w=200, parent=xgui_banwindow, enableinput=true, selectall=true, choices=ULib.cmds.translatedCmds["ulx ban"].args[4].completes }
+	local banpanel = ULib.cmds.NumArg.x_getcontrol( ULib.cmds.translatedCmds["ulx banip"].args[3], 2, xgui_banwindow )
+	banpanel.interval:SetParent( xgui_banwindow )
+	banpanel.interval:SetPos( 200, 83 )
+	banpanel.val:SetParent( xgui_banwindow )
+	banpanel.val:SetPos( 75, 104 )
+	banpanel.val:SetWidth( 200 )
+
+	local ipAddr
+	-- name.ipAddr = ipAddr --Make a reference to the ipAddr textbox so it can change the value easily without needing a global variable
+
+	if not isUpdate then
+		local tangentId = ULib.randomString(16, true)
+
+		ipAddr = xlib.makecombobox{ x=75, y=30, w=200, parent=xgui_banwindow, enableinput=true, selectall=true }
+		net.Receive("ulib_receivePlayerIP", function (len)
+			local allowed = net.ReadInt(1)
+			local tangent = net.ReadString()
+			if not allowed or (tangent ~= tangentId) then
+				print("OH NO")
+				return
+			end
+
+			local player = net.ReadPlayer()
+			local ip = ULib.splitPort(net.ReadString())
+
+			if (IsValid(player) and ULib.isValidIP(ip)) then
+				ipAddr:AddChoice( player:Nick(), ip )
+			end
+		end)
+		for k,v in pairs( player.GetHumans() ) do
+			net.Start("ulib_requestPlayerIP")
+				net.WriteString(tangentId)
+				net.WritePlayer(v)
+			net.SendToServer()
+		end
+		ipAddr.OnSelect = function( self, index, value, data )
+			self:SetText( data )
+		end
+	else
+		ipAddr = xlib.maketextbox{ x=75, y=58, w=200, selectall=true, disabled=( isUpdate or not LocalPlayer():query( "ulx banip" ) ), parent=xgui_banwindow }
+
+		if bandata then
+			ipAddr:SetText( bandata.ipAddr or "" )
+			reason:SetText( bandata.reason or "" )
+			if tonumber( bandata.unban ) ~= 0 then
+				local btime = ( tonumber( bandata.unban ) - tonumber( bandata.time ) )
+				if btime % 31536000 == 0 then
+					if #banpanel.interval.Choices >= 6 then
+						banpanel.interval:ChooseOptionID(6)
+					else
+						banpanel.interval:SetText( "Years" )
+					end
+					btime = btime / 31536000
+				elseif btime % 604800 == 0 then
+					if #banpanel.interval.Choices >= 5 then
+						banpanel.interval:ChooseOptionID(5)
+					else
+						banpanel.interval:SetText( "Weeks" )
+					end
+					btime = btime / 604800
+				elseif btime % 86400 == 0 then
+					if #banpanel.interval.Choices >= 4 then
+						banpanel.interval:ChooseOptionID(4)
+					else
+						banpanel.interval:SetText( "Days" )
+					end
+					btime = btime / 86400
+				elseif btime % 3600 == 0 then
+					if #banpanel.interval.Choices >= 3 then
+						banpanel.interval:ChooseOptionID(3)
+					else
+						banpanel.interval:SetText( "Hours" )
+					end
+					btime = btime / 3600
+				else
+					btime = btime / 60
+					if #banpanel.interval.Choices >= 2 then
+						banpanel.interval:ChooseOptionID(2)
+					else
+						banpanel.interval:SetText( "Minutes" )
+					end
+				end
+				banpanel.val:SetValue( btime )
+			end
+		end
+	end
+
+
+	xlib.makebutton{ x=165, y=130, w=75, label="Cancel", parent=xgui_banwindow }.DoClick = function()
+		xgui_banwindow:Remove()
+	end
+	xlib.makebutton{ x=45, y=130, w=75, label=( isUpdate and "Update" or "Ban!" ), parent=xgui_banwindow }.DoClick = function()
+		if isUpdate then
+			local function performUpdate(btime)
+				RunConsoleCommand( "xgui", "updateIPBan", ipAddr:GetValue(), btime, reason:GetValue() )
+				xgui_banwindow:Remove()
+			end
+			btime = banpanel:GetMinutes()
+			if btime ~= 0 and bandata and btime * 60 + bandata.time < os.time() then
+				Derma_Query( "WARNING! The new ban time you have specified will cause this ban to expire.\nThe minimum time required in order to change the ban length successfully is "
+						.. xgui.ConvertTime( os.time() - bandata.time ) .. ".\nAre you sure you wish to continue?", "XGUI WARNING",
+					"Expire Ban", function()
+						performUpdate(btime)
+						xbans.RemoveBanDetailsWindow( bandata.ipAddr )
+					end,
+					"Cancel", function() end )
+			else
+				performUpdate(btime)
+			end
+			return
+		end
+
+		if ULib.isValidIP( ipAddr:GetValue() ) then
+			if (isUpdate) then
+				RunConsoleCommand( "xgui", "updateIPBan", ipAddr:GetValue(), banpanel:GetMinutes(), reason:GetValue() )
+			else
+				RunConsoleCommand( "ulx", "banip", ipAddr:GetValue(), banpanel:GetValue(), reason:GetValue() )
+			end
+			xgui_banwindow:Remove()
+		else
+			-- local ply, message = ULib.getUser( name:GetValue() )
+			-- if ply then
+			-- 	RunConsoleCommand( "ulx", "ban", "$" .. ULib.getUniqueIDForPlayer( ply ), banpanel:GetValue(), reason:GetValue() )
+			-- 	xgui_banwindow:Remove()
+			-- 	return
+			-- end
+			Derma_Message( "Invalid IP." )
+		end
+	end
+
+	if ID then ipAddr:SetText( ID ) else ipAddr:SetText( "0.0.0.0" ) end
 end
 
 function xgui.ConvertTime( seconds )

@@ -47,8 +47,8 @@ files["banmessage.txt"] = [[
 ; {{BAN_START}} - The date/time of the ban, in the server's time zone
 ; {{REASON}} - The ban reason
 ; {{TIME_LEFT}} - The time left in the ban
-; {{STEAMID}} - The banned player's Steam ID (excluding non-number characters)
-; {{STEAMID64}} - The banned player's 64-bit Steam ID
+; {{STEAMID_OR_IP}} - The banned player's Steam ID (excluding non-number characters)
+; {{STEAMID64_OR_IP}} - The banned player's 64-bit Steam ID
 ; The two steam ID variables are useful for constructing URLs for appealing bans
 -------===== [ BANNED ] =====-------
 

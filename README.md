@@ -8,6 +8,10 @@ Visit our homepage at https://ulyssesmod.net.
 
 You can talk to us on our forums at https://forums.ulyssesmod.net.
 
+# Monkestation
+
+This is a fork of ULX with some additional features added on to it such as IP banning.
+
 ## Requirements
 ULX requires the latest version of [ULib](https://github.com/TeamUlysses/ulib) to be installed on the server.
 

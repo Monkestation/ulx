@@ -90,6 +90,66 @@ function bans.init()
 	end
 	xgui.addCmd( "updateBan", bans.updateBan )
 
+	function bans.updateIPBan( ply, args )
+		print("uhhhh")
+		local access, accessTag = ULib.ucl.query( ply, "ulx banip" )
+		if not access then
+			ULib.tsayError( ply, "Error editing ban: You must have access to ulx banip, " .. ply:Nick() .. "!", true )
+			return
+		end
+
+		local ipAddr = args[1] or ""
+		local bantime = tonumber( args[2] )
+		local reason = args[3]
+
+		-- Check IP
+		if not ULib.isValidIP(ipAddr) then
+			ULib.tsayError( ply, "Invalid IP", true )
+			return
+		end
+
+		-- Check restrictions
+		local cmd = ULib.cmds.translatedCmds[ "ulx ban" ]
+		local accessPieces = {}
+		if accessTag then
+			accessPieces = ULib.splitArgs( accessTag, "<", ">" )
+		end
+
+		-- Ban length
+		local argInfo = cmd.args[3]
+		print(cmd.args[3])
+		local success, err = argInfo.type:parseAndValidate( ply, bantime, argInfo, accessPieces[2] )
+		if not success then
+			ULib.tsayError( ply, "Error editing ban: " .. err, true )
+			return
+		end
+
+		-- Reason
+		local argInfo = cmd.args[4]
+		print(cmd.args[4])
+		local success, err = argInfo.type:parseAndValidate( ply, reason, argInfo, accessPieces[3] )
+		if not success then
+			ULib.tsayError( ply, "Error editing ban: You did not specify a valid reason, " .. ply:Nick() .. "!", true )
+			return
+		end
+
+
+		if not ULib.bans[ipAddr] then
+			ULib.addIPBan( ipAddr, bantime, reason, ply )
+			return
+		end
+
+		if bantime ~= 0 then
+			if (ULib.bans[ipAddr].time + bantime*60) <= os.time() then --New ban time makes the ban expired
+				ULib.unbanIP( ipAddr, ply )
+				return
+			end
+			bantime = bantime - (os.time() - ULib.bans[ipAddr].time)/60
+		end
+		ULib.addIPBan( ipAddr, bantime, reason, ply )
+	end
+	xgui.addCmd( "updateIPBan", bans.updateIPBan )
+
 	--Misc functions
 	function bans.processBans()
 		bans.clearSortCache()

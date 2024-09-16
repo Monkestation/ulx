@@ -101,8 +101,46 @@ local ban = ulx.command( CATEGORY_NAME, "ulx ban", ulx.ban, "!ban", false, false
 ban:addParam{ type=ULib.cmds.PlayerArg }
 ban:addParam{ type=ULib.cmds.NumArg, hint="minutes, 0 for perma", ULib.cmds.optional, ULib.cmds.allowTimeString, min=0 }
 ban:addParam{ type=ULib.cmds.StringArg, hint="reason", ULib.cmds.optional, ULib.cmds.takeRestOfLine, completes=ulx.common_kick_reasons }
+ban:addParam{ type=ULib.cmds.BoolArg, hint="IP Ban", ULib.cmds.optional }
 ban:defaultAccess( ULib.ACCESS_ADMIN )
 ban:help( "Bans target." )
+
+------------------------------ BanIP ------------------------------
+function ulx.banip( calling_ply, ip_address, minutes, reason )
+	if not ULib.isValidIP( ip_address ) then
+		ULib.tsayError( calling_ply, "Invalid IP address." )
+		return
+	end
+
+	if minutes == 0 then
+		ulx.fancyLogAdmin( calling_ply, true, "#A banned IP address #s", ip_address, minutes )
+	else
+		ulx.fancyLogAdmin( calling_ply, true, "#A banned IP address #s for #s", ip_address, ULib.secondsToStringTime( minutes * 60 ) )
+	end
+
+	ULib.queueFunctionCall(ULib.addIPBan, ip_address, minutes, reason, calling_ply)
+end
+local banip = ulx.command( CATEGORY_NAME, "ulx banip", ulx.banip, "!banip", true, nil, true )
+banip:addParam{ type=ULib.cmds.StringArg, hint="IP address" }
+banip:addParam{ type=ULib.cmds.NumArg, min=0, default=1440, hint="minutes, 0 for perma", ULib.cmds.allowTimeString, ULib.cmds.optional }
+banip:defaultAccess( ULib.ACCESS_SUPERADMIN )
+banip:help( "Add IP address to banlist." )
+
+function ulx.unbanip( calling_ply, ip_address )
+	if not ULib.isValidIP( ip_address ) then
+		ULib.tsayError( calling_ply, "Invalid IP address." )
+		return
+	end
+
+	RunConsoleCommand( "removeip", ip_address )
+	RunConsoleCommand( "writeip" )
+
+	ulx.fancyLogAdmin( calling_ply, true, "#A unbanned IP address #s", ip_address )
+end
+local unbanip = ulx.command( CATEGORY_NAME, "ulx unbanip", ulx.unbanip, "!unbanip", true, nil, true )
+unbanip:addParam{ type=ULib.cmds.StringArg, hint="IP address" }
+unbanip:defaultAccess( ULib.ACCESS_SUPERADMIN )
+unbanip:help( "Remove IP address from banlist." )
 
 ------------------------------ BanID ------------------------------
 function ulx.banid( calling_ply, steamid, minutes, reason )
@@ -397,11 +435,11 @@ function ulx.resettodefaults( calling_ply, param )
 	ULib.fileDelete( "data/ulib/groups.txt" )
 	ULib.fileDelete( "data/ulib/misc_registered.txt" )
 	ULib.fileDelete( "data/ulib/users.txt" )
-	
+
   	if sql.TableExists( "ulib_bans" ) then
     		sql.Query( "DROP TABLE ulib_bans" )
 	end
-	
+
   	if sql.TableExists( "ulib_users" ) then
     		sql.Query( "DROP TABLE ulib_users" )
 	end
